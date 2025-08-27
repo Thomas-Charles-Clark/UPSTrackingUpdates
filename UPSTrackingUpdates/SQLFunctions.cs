@@ -2,10 +2,12 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using Microsoft.SqlServer.Server;
@@ -23,6 +25,7 @@ namespace UPSTrackingUpdates
     {
         private static readonly string upsOAuthEndpoint = "https://onlinetools.ups.com/security/v1/oauth/token";
         private static readonly string upsTrackingEndpoint = "https://onlinetools.ups.com/api/track/v1/details";
+        private static readonly Regex upsLogoRegex = new Regex("(src=\"\\.)");
 
         [SqlFunction(DataAccess = DataAccessKind.Read,
             FillRowMethodName = "FetchTrackingInfo_FillRow")]
@@ -113,7 +116,7 @@ namespace UPSTrackingUpdates
 
         [SqlFunction(DataAccess = DataAccessKind.Read,
             FillRowMethodName = "FetchTrackingActivity_FillRow")]
-        public static IEnumerable FetchTrackingActivity(string UPSTrackingNumber)
+        public static IEnumerable FetchTrackingActivity(string UPSTrackingNumber, string ProofOfDeliveryDestinationFolder)
         {
             Framework.SetTLS();
 
@@ -148,7 +151,7 @@ namespace UPSTrackingUpdates
 
                 client.DefaultRequestHeaders.Add("transactionSrc", $"UPSTrackingUpdates-JL");
 
-                var requestUrl = $"{upsTrackingEndpoint}/{UPSTrackingNumber}";
+                var requestUrl = $"{upsTrackingEndpoint}/{UPSTrackingNumber}?returnSignature=true&returnPOD=true";
 
                 var response = client.GetAsync(requestUrl).Result;
 
@@ -162,6 +165,10 @@ namespace UPSTrackingUpdates
 
                 if (response.IsSuccessStatusCode)
                 {
+#if DEBUG
+                    Console.WriteLine($"Processing {UPSTrackingNumber}");
+#endif
+
                     var trackingResponseWrapper = responseJsonObject.ToObject<TrackResponseWrapper>();
 
                     foreach(var p in trackingResponseWrapper.TrackResponse.Shipments?.SelectMany(q => q.Packages?.SelectMany(j => j.Activity)))
@@ -169,6 +176,54 @@ namespace UPSTrackingUpdates
                         p.UPSTrackingNumber = UPSTrackingNumber;
 
                         results.Add(p);
+                    }
+
+                    if (!String.IsNullOrEmpty(ProofOfDeliveryDestinationFolder))
+                    {
+                        if (!Directory.Exists(ProofOfDeliveryDestinationFolder))
+                        {
+                            Directory.CreateDirectory(ProofOfDeliveryDestinationFolder);
+                        }
+
+                        trackingResponseWrapper.TrackResponse.Shipments?.SelectMany(q => q.Packages).ToList().ForEach(p => 
+                        { 
+                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.Signature?.Base64EncodedImage))
+                            {
+                                var deliverySignatureBytes = Convert.FromBase64String(p.DeliveryInformation?.Signature?.Base64EncodedImage);
+
+                                var deliverySignatureFileName = $"{ProofOfDeliveryDestinationFolder}\\DeliverySignature.{ImageDetector.GetImageType(deliverySignatureBytes).ToString().ToLowerInvariant()}";
+
+                                Console.WriteLine($"Wrote {deliverySignatureFileName}");
+
+                                File.WriteAllBytes(deliverySignatureFileName, deliverySignatureBytes);
+                            }
+
+                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.ProofOfDelivery?.Base64EncodedImage))
+                            {
+                                var proofOfDeliveryBytes = Convert.FromBase64String(p.DeliveryInformation?.ProofOfDelivery?.Base64EncodedImage);
+
+                                var proofOfDeliveryHtml = Encoding.UTF8.GetString(proofOfDeliveryBytes).Trim();
+
+                                proofOfDeliveryHtml = upsLogoRegex.Replace(proofOfDeliveryHtml, "src=\"..");
+
+                                var proofOfDeliveryFileName = $"{ProofOfDeliveryDestinationFolder}\\ProofOfDelivery.html";
+
+                                File.WriteAllText(proofOfDeliveryFileName, proofOfDeliveryHtml);
+
+                                Console.WriteLine($"Wrote {proofOfDeliveryFileName}");
+                            }
+
+                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.DeliveryPhoto?.Base64EncodedContent))
+                            {
+                                var deliveryPhotoBytes = Convert.FromBase64String(p.DeliveryInformation?.DeliveryPhoto?.Base64EncodedContent);
+
+                                var deliveryPhotoBytesFileName = $"{ProofOfDeliveryDestinationFolder}\\DeliveryPhoto.{ImageDetector.GetImageType(deliveryPhotoBytes).ToString().ToLowerInvariant()}";
+
+                                File.WriteAllBytes(deliveryPhotoBytesFileName, deliveryPhotoBytes);
+
+                                Console.WriteLine($"Wrote {deliveryPhotoBytesFileName}");
+                            }
+                        });
                     }
                 }
                 else

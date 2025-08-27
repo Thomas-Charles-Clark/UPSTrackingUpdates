@@ -13,6 +13,7 @@ using Newtonsoft.Json.Linq;
 
 using UPSTrackingUpdates;
 using UPSTrackingUpdates.Models.Tracking;
+using System.Data.SqlClient;
 
 namespace Tester
 {
@@ -35,8 +36,6 @@ namespace Tester
 
             sw.Start();
 
-            var trackingNumber = "1Z5WR5156877515780";
-
             //SqlDateTime ActivityDT = SqlDateTime.Null;
             //SqlString StatusCode = SqlString.Null;
             //SqlString StatusDescription = SqlString.Null;
@@ -53,7 +52,32 @@ namespace Tester
             //SqlString StateProvince = SqlString.Null;
             //SqlString SiteLocationIndicatorCode = SqlString.Null;
 
-            var result = SQLFunctions.FetchTrackingActivity(trackingNumber).OfType<Activity>().ToList();
+            var trackingNumbers = new List<string>();
+
+            using (var conn = new SqlConnection("Data Source=vm-sql;Initial Catalog=Flock;Integrated Security=SSPI"))
+            {
+                 var comm = conn.CreateCommand();
+
+                comm.CommandText = @"SELECT TOP 200 TrackingNumber FROM Mertex.[ParcelHead]
+                    WHERE HaulierCode = N'UPS' AND CompletedDT < '2025/07/31'
+                    ORDER BY CompletedDT DESC";
+
+                conn.Open();
+
+                var reader = comm.ExecuteReader();
+
+                while(reader.Read())
+                {
+                    trackingNumbers.Add(reader.GetString(0));
+                }
+
+                conn.Close();
+            }
+
+            foreach(var trackingNumber in trackingNumbers)
+            {
+                var result = SQLFunctions.FetchTrackingActivity(trackingNumber, $"\\\\PC247\\c$\\users\\tclark\\source\\repos\\UPSTrackingUpdates\\Tester\\Photos\\{trackingNumber}").OfType<Activity>().ToList();
+            }
 
             //SQLFunctions.FetchTrackingActivity_FillRow(result,
             //    out ActivityDT,
@@ -73,7 +97,7 @@ namespace Tester
             //    out SiteLocationIndicatorCode
             //);
 
-            Console.WriteLine(JsonConvert.SerializeObject(result));
+            //Console.WriteLine(JsonConvert.SerializeObject(result));
             
             Console.WriteLine();
 

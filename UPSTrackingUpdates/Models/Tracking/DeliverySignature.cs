@@ -11,6 +11,6 @@ namespace UPSTrackingUpdates.Models.Tracking
     internal class DeliverySignature
     {
         [JsonProperty("image")]
-        public byte[] Image { get; set; }
+        public string Base64EncodedImage { get; set; }
     }
 }

@@ -14,7 +14,7 @@ namespace UPSTrackingUpdates.Models.Tracking
         public string IsNonPostalCodeCountry { get; set; }
 
         [JsonProperty("photo")]
-        public byte[] Photo { get; set; }
+        public string Base64EncodedContent { get; set; }
 
         [JsonProperty("photoCaptureInd")]
         public string PhotoCapturedIndicator { get; set; }
