@@ -52,31 +52,43 @@ namespace Tester
             //SqlString StateProvince = SqlString.Null;
             //SqlString SiteLocationIndicatorCode = SqlString.Null;
 
-            var trackingNumbers = new List<string>();
+            var trackingNumbers = new List<string>() { "1Z5WR5156878170758" };
 
-            using (var conn = new SqlConnection("Data Source=vm-sql;Initial Catalog=Flock;Integrated Security=SSPI"))
+            //using (var conn = new SqlConnection("Data Source=vm-sql;Initial Catalog=Flock;Integrated Security=SSPI"))
+            //{
+            //     var comm = conn.CreateCommand();
+
+            //comm.CommandText = @"SELECT TOP 10 TrackingNumber FROM Mertex.[ParcelHead]
+            //        WHERE HaulierCode = N'UPS' AND CompletedDT < '2025/07/31'
+            //        ORDER BY CompletedDT DESC";
+
+            //    conn.Open();
+
+            //    var reader = comm.ExecuteReader();
+
+            //    while(reader.Read())
+            //    {
+            //        trackingNumbers.Add(reader.GetString(0));
+            //    }
+
+            //    conn.Close();
+            //}
+
+            foreach (var trackingNumber in trackingNumbers)
             {
-                 var comm = conn.CreateCommand();
+                var results = SQLFunctions.FetchTrackingProofOfDelivery(trackingNumber, $"\\\\PC247\\c$\\users\\tclark\\source\\repos\\UPSTrackingUpdates\\Tester\\Documents\\{trackingNumber}").OfType<DeliveryInformation>().ToList();
 
-                comm.CommandText = @"SELECT TOP 200 TrackingNumber FROM Mertex.[ParcelHead]
-                    WHERE HaulierCode = N'UPS' AND CompletedDT < '2025/07/31'
-                    ORDER BY CompletedDT DESC";
+                SqlString UPSTrackingNumber;
+                SqlString ProofOfDeliveryPDFPath;
+                SqlBoolean DeliverySignatureIncluded;
+                SqlBoolean DeliveryPhotographIncluded;
 
-                conn.Open();
-
-                var reader = comm.ExecuteReader();
-
-                while(reader.Read())
+                foreach (var result in results)
                 {
-                    trackingNumbers.Add(reader.GetString(0));
+                    SQLFunctions.FetchTrackingProofOfDelivery_FillRow(result, out UPSTrackingNumber, out ProofOfDeliveryPDFPath, out DeliverySignatureIncluded, out DeliveryPhotographIncluded);
+                
+                    
                 }
-
-                conn.Close();
-            }
-
-            foreach(var trackingNumber in trackingNumbers)
-            {
-                var result = SQLFunctions.FetchTrackingActivity(trackingNumber, $"\\\\PC247\\c$\\users\\tclark\\source\\repos\\UPSTrackingUpdates\\Tester\\Photos\\{trackingNumber}").OfType<Activity>().ToList();
             }
 
             //SQLFunctions.FetchTrackingActivity_FillRow(result,

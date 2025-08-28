@@ -10,6 +10,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
+using HtmlAgilityPack;
+using iTextSharp.tool.xml.html;
+
 using Microsoft.SqlServer.Server;
 
 using Newtonsoft.Json;
@@ -113,10 +116,9 @@ namespace UPSTrackingUpdates
             }
         }
 
-
         [SqlFunction(DataAccess = DataAccessKind.Read,
             FillRowMethodName = "FetchTrackingActivity_FillRow")]
-        public static IEnumerable FetchTrackingActivity(string UPSTrackingNumber, string ProofOfDeliveryDestinationFolder)
+        public static IEnumerable FetchTrackingActivity(string UPSTrackingNumber)
         {
             Framework.SetTLS();
 
@@ -149,9 +151,9 @@ namespace UPSTrackingUpdates
 
                 client.DefaultRequestHeaders.Add("transId", Guid.NewGuid().ToString());
 
-                client.DefaultRequestHeaders.Add("transactionSrc", $"UPSTrackingUpdates-JL");
+                client.DefaultRequestHeaders.Add("transactionSrc", $"UPSTrackingUpdates");
 
-                var requestUrl = $"{upsTrackingEndpoint}/{UPSTrackingNumber}?returnSignature=true&returnPOD=true";
+                var requestUrl = $"{upsTrackingEndpoint}/{UPSTrackingNumber}";
 
                 var response = client.GetAsync(requestUrl).Result;
 
@@ -159,9 +161,9 @@ namespace UPSTrackingUpdates
 
                 var responseJsonObject = JObject.Parse(responseString);
 
-//#if DEBUG
-//                Console.WriteLine(responseJsonObject);
-//#endif
+                //#if DEBUG
+                //                Console.WriteLine(responseJsonObject);
+                //#endif
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -171,59 +173,11 @@ namespace UPSTrackingUpdates
 
                     var trackingResponseWrapper = responseJsonObject.ToObject<TrackResponseWrapper>();
 
-                    foreach(var p in trackingResponseWrapper.TrackResponse.Shipments?.SelectMany(q => q.Packages?.SelectMany(j => j.Activity)))
+                    foreach (var p in trackingResponseWrapper.TrackResponse.Shipments?.SelectMany(q => q.Packages?.SelectMany(j => j.Activity)))
                     {
                         p.UPSTrackingNumber = UPSTrackingNumber;
 
                         results.Add(p);
-                    }
-
-                    if (!String.IsNullOrEmpty(ProofOfDeliveryDestinationFolder))
-                    {
-                        if (!Directory.Exists(ProofOfDeliveryDestinationFolder))
-                        {
-                            Directory.CreateDirectory(ProofOfDeliveryDestinationFolder);
-                        }
-
-                        trackingResponseWrapper.TrackResponse.Shipments?.SelectMany(q => q.Packages).ToList().ForEach(p => 
-                        { 
-                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.Signature?.Base64EncodedImage))
-                            {
-                                var deliverySignatureBytes = Convert.FromBase64String(p.DeliveryInformation?.Signature?.Base64EncodedImage);
-
-                                var deliverySignatureFileName = $"{ProofOfDeliveryDestinationFolder}\\DeliverySignature.{ImageDetector.GetImageType(deliverySignatureBytes).ToString().ToLowerInvariant()}";
-
-                                Console.WriteLine($"Wrote {deliverySignatureFileName}");
-
-                                File.WriteAllBytes(deliverySignatureFileName, deliverySignatureBytes);
-                            }
-
-                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.ProofOfDelivery?.Base64EncodedImage))
-                            {
-                                var proofOfDeliveryBytes = Convert.FromBase64String(p.DeliveryInformation?.ProofOfDelivery?.Base64EncodedImage);
-
-                                var proofOfDeliveryHtml = Encoding.UTF8.GetString(proofOfDeliveryBytes).Trim();
-
-                                proofOfDeliveryHtml = upsLogoRegex.Replace(proofOfDeliveryHtml, "src=\"..");
-
-                                var proofOfDeliveryFileName = $"{ProofOfDeliveryDestinationFolder}\\ProofOfDelivery.html";
-
-                                File.WriteAllText(proofOfDeliveryFileName, proofOfDeliveryHtml);
-
-                                Console.WriteLine($"Wrote {proofOfDeliveryFileName}");
-                            }
-
-                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.DeliveryPhoto?.Base64EncodedContent))
-                            {
-                                var deliveryPhotoBytes = Convert.FromBase64String(p.DeliveryInformation?.DeliveryPhoto?.Base64EncodedContent);
-
-                                var deliveryPhotoBytesFileName = $"{ProofOfDeliveryDestinationFolder}\\DeliveryPhoto.{ImageDetector.GetImageType(deliveryPhotoBytes).ToString().ToLowerInvariant()}";
-
-                                File.WriteAllBytes(deliveryPhotoBytesFileName, deliveryPhotoBytes);
-
-                                Console.WriteLine($"Wrote {deliveryPhotoBytesFileName}");
-                            }
-                        });
                     }
                 }
                 else
@@ -273,6 +227,144 @@ namespace UPSTrackingUpdates
             PostalCode = p.Location?.Address?.PostalCode ?? SqlString.Null;
             StateProvince = p.Location?.Address?.StateProvince ?? SqlString.Null;
             SiteLocationIndicatorCode = p.Location?.SiteLocationIndicatorCode ?? SqlString.Null;
+        }
+
+        [SqlFunction(DataAccess = DataAccessKind.Read,
+            FillRowMethodName = "FetchTrackingProofOfDelivery_FillRow")]
+        public static IEnumerable FetchTrackingProofOfDelivery(string UPSTrackingNumber, string ProofOfDeliveryDestinationFolder)
+        {
+            Framework.SetTLS();
+
+            var results = new ArrayList();
+
+            var credentials = Framework.GetCredentials();
+
+            bool deliverySignatureIncluded = false;
+
+            bool deliveryPhotoIncluded = false;
+
+            bool deliveryProofIncluded = false;
+
+            using (var client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Add("x-merchant-id", credentials.AccountNumber);
+
+                var base64String = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{credentials.ClientID}:{credentials.ClientSecret}"));
+
+                client.DefaultRequestHeaders.Add("Authorization", "Basic " + base64String);
+
+                var oauthRequest = client.PostAsync(upsOAuthEndpoint, new FormUrlEncodedContent(new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("grant_type", "client_credentials")
+                })).Result;
+
+                var oauthResponse = oauthRequest.Content.ReadAsStringAsync().Result;
+
+                var oauthTokenResponse = JsonConvert.DeserializeObject<OAuthResponse>(oauthResponse);
+
+                client.DefaultRequestHeaders.Clear();
+
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {oauthTokenResponse.AccessToken}");
+
+                client.DefaultRequestHeaders.Add("Accept", "application/json");
+
+                client.DefaultRequestHeaders.Add("transId", Guid.NewGuid().ToString());
+
+                client.DefaultRequestHeaders.Add("transactionSrc", $"UPSTrackingUpdates");
+
+                var requestUrl = $"{upsTrackingEndpoint}/{UPSTrackingNumber}?returnSignature=true&returnPOD=true";
+
+                var response = client.GetAsync(requestUrl).Result;
+
+                var responseString = response.Content.ReadAsStringAsync().Result;
+
+                var responseJsonObject = JObject.Parse(responseString);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var trackingResponseWrapper = responseJsonObject.ToObject<TrackResponseWrapper>();
+
+                    var proofOfDeliveryPDFPath = (string)null;
+
+                    if (!String.IsNullOrEmpty(ProofOfDeliveryDestinationFolder))
+                    {
+                        if (!Directory.Exists(ProofOfDeliveryDestinationFolder))
+                        {
+                            Directory.CreateDirectory(ProofOfDeliveryDestinationFolder);
+                        }
+
+                        trackingResponseWrapper.TrackResponse.Shipments?.SelectMany(q => q.Packages).ToList().ForEach(p =>
+                        {
+                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.Signature?.Base64EncodedImage))
+                            {
+                                var deliverySignatureBytes = Convert.FromBase64String(p.DeliveryInformation?.Signature?.Base64EncodedImage);
+
+                                var deliverySignatureFileName = $"{ProofOfDeliveryDestinationFolder}\\DeliverySignature.{ImageDetector.GetImageType(deliverySignatureBytes).ToString().ToLowerInvariant()}";
+
+                                deliverySignatureIncluded = true;
+
+                                File.WriteAllBytes(deliverySignatureFileName, deliverySignatureBytes);
+                            }
+
+                            if (!String.IsNullOrEmpty(p.DeliveryInformation?.ProofOfDelivery?.Base64EncodedImage))
+                            {
+                                var proofOfDeliveryBytes = Convert.FromBase64String(p.DeliveryInformation?.ProofOfDelivery?.Base64EncodedImage);
+
+                                var proofOfDeliveryHtml = Encoding.UTF8.GetString(proofOfDeliveryBytes).Trim();
+
+                                var agilityPackDocument = new HtmlDocument();
+
+                                // Configure parsing options
+                                agilityPackDocument.OptionFixNestedTags = true;
+                                agilityPackDocument.OptionAutoCloseOnEnd = true;
+                                agilityPackDocument.OptionWriteEmptyNodes = true;
+
+                                agilityPackDocument.LoadHtml(proofOfDeliveryHtml);
+
+                                proofOfDeliveryHtml = agilityPackDocument.DocumentNode.OuterHtml;
+
+                                proofOfDeliveryHtml = upsLogoRegex.Replace(proofOfDeliveryHtml, "src=\"..");
+
+                                var proofOfDeliveryFileNamePDF = $"{ProofOfDeliveryDestinationFolder}\\{UPSTrackingNumber}_ProofOfDelivery.pdf";
+
+                                deliveryProofIncluded = true;
+
+                                PDFWriter.WritePDF(proofOfDeliveryHtml, proofOfDeliveryFileNamePDF);
+
+                                proofOfDeliveryPDFPath = proofOfDeliveryFileNamePDF;
+                            }
+
+                            p.DeliveryInformation.UPSTrackingNumber = UPSTrackingNumber;
+                            p.DeliveryInformation.ProofOfDeliveryPDFPath = proofOfDeliveryPDFPath;
+                            p.DeliveryInformation.DeliverySignatureIncluded = deliverySignatureIncluded;
+                            p.DeliveryInformation.DeliveryPhotographIncluded = deliveryPhotoIncluded;
+
+                            results.Add(p.DeliveryInformation);
+                        });
+                    }
+                }
+                else
+                {
+                    throw new Exception(responseString);
+                }
+            }
+
+            return results;
+        }
+        public static void FetchTrackingProofOfDelivery_FillRow(
+            object o,
+            out SqlString UPSTrackingNumber,
+            out SqlString ProofOfDeliveryPDFPath,
+            out SqlBoolean DeliverySignatureIncluded,
+            out SqlBoolean DeliveryPhotographIncluded
+            )
+        {
+            var p = (DeliveryInformation)o;
+
+            UPSTrackingNumber = p.UPSTrackingNumber;
+            ProofOfDeliveryPDFPath = p.ProofOfDeliveryPDFPath;
+            DeliverySignatureIncluded = p.DeliverySignatureIncluded;
+            DeliveryPhotographIncluded = p.DeliveryPhotographIncluded;
         }
     }
 }

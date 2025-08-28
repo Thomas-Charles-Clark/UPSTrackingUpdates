@@ -24,5 +24,13 @@ namespace UPSTrackingUpdates.Models.Tracking
 
         [JsonProperty("pod")]
         public ProofOfDelivery ProofOfDelivery { get; set; }
+
+        public string UPSTrackingNumber { get; set; }
+
+        public string ProofOfDeliveryPDFPath { get; set; }
+
+        public bool DeliverySignatureIncluded { get; set; }
+
+        public bool DeliveryPhotographIncluded { get; set; }
     }
 }

@@ -43,8 +43,20 @@
     <Reference Include="Dapper.StrongName">
       <HintPath>ExternalDependencies\Dapper.StrongName.dll</HintPath>
     </Reference>
+    <Reference Include="HtmlAgilityPack, Version=1.11.36.0, Culture=neutral, PublicKeyToken=bd319b19eaf3b43a, processorArchitecture=MSIL">
+      <HintPath>..\packages\HtmlAgilityPack.1.11.36\lib\Net45\HtmlAgilityPack.dll</HintPath>
+    </Reference>
+    <Reference Include="itextsharp, Version=5.5.12.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+      <HintPath>..\packages\iTextSharp.5.5.12\lib\itextsharp.dll</HintPath>
+    </Reference>
+    <Reference Include="itextsharp.xmlworker, Version=5.5.12.0, Culture=neutral, PublicKeyToken=8354ae6d2174ddca, processorArchitecture=MSIL">
+      <HintPath>..\packages\itextsharp.xmlworker.5.5.12\lib\itextsharp.xmlworker.dll</HintPath>
+    </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="SimpleImpersonation">
+      <HintPath>..\..\SimpleImpersonation\SimpleImpersonation\bin\Release\SimpleImpersonation.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -87,8 +99,10 @@
     <Compile Include="Models\Tracking\Weight.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SQLFunctions.cs" />
+    <Compile Include="Utilities\ElementHandler.cs" />
     <Compile Include="Utilities\Framework.cs" />
     <Compile Include="Utilities\ImageDetection.cs" />
+    <Compile Include="Utilities\PDFWriter.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ExternalDependencies\Dapper.snk">
@@ -97,6 +111,7 @@
     <None Include="ExternalDependencies\DapperContrib.snk">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Fonts\Gill-Sans-MT.ttf" />
     <None Include="key.snk">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -118,6 +133,10 @@
       <Project>{2e068d47-9a8a-44f7-8470-2c0e6ef4eb87}</Project>
       <Name>SoapTracer</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Images\ups_banner.gif" />
+    <Content Include="Images\ups_logo.gif" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -75,6 +75,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="Fonts\Gill-Sans-MT.ttf" />
     <None Include="key.snk" />
     <None Include="packages.config" />
   </ItemGroup>
@@ -96,6 +97,9 @@
       <Name>UPSTrackingUpdates</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="Images\ups_banner.gif" />
+    <Content Include="Images\ups_logo.gif" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
