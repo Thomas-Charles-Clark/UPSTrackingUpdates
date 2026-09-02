@@ -23,7 +23,7 @@ namespace UPSTrackingUpdates.Models.Tracking
         public IEnumerable<string> AdditionalServices { get; set; }
 
         [JsonProperty("alternateTrackingNumber")]
-        public AlternateTrackingNumber AlternateTrackingNumber { get; set; }
+        public IEnumerable<AlternateTrackingNumber> AlternateTrackingNumber { get; set; }
 
         [JsonProperty("currentStatus")]
         public Status CurrentStatus { get; set; }

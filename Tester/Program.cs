@@ -52,7 +52,7 @@ namespace Tester
             //SqlString StateProvince = SqlString.Null;
             //SqlString SiteLocationIndicatorCode = SqlString.Null;
 
-            var trackingNumbers = new List<string>() { "1Z5WR5156878170758" };
+            var trackingNumbers = new List<string>() { "1Z5WR5150476489047" };
 
             //using (var conn = new SqlConnection("Data Source=vm-sql;Initial Catalog=Flock;Integrated Security=SSPI"))
             //{
@@ -76,7 +76,7 @@ namespace Tester
 
             foreach (var trackingNumber in trackingNumbers)
             {
-                var results = SQLFunctions.FetchTrackingProofOfDelivery(trackingNumber, $"\\\\PC247\\c$\\users\\tclark\\source\\repos\\UPSTrackingUpdates\\Tester\\Documents\\{trackingNumber}").OfType<DeliveryInformation>().ToList();
+                var results = SQLFunctions.FetchTrackingProofOfDelivery($"{trackingNumber}_ProofOfDelivery", trackingNumber, $"\\\\PC247\\c$\\users\\tclark\\source\\repos\\UPSTrackingUpdates\\Tester\\Documents\\{trackingNumber}").OfType<DeliveryInformation>().ToList();
 
                 SqlString UPSTrackingNumber;
                 SqlString ProofOfDeliveryPDFPath;

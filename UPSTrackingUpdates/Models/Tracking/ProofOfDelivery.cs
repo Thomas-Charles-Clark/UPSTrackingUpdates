@@ -11,6 +11,6 @@ namespace UPSTrackingUpdates.Models.Tracking
     internal class ProofOfDelivery
     {
         [JsonProperty("content")]
-        public string Base64EncodedImage { get; set; }
+        public string Base64EncodedHTML { get; set; }
     }
 }

@@ -14,7 +14,7 @@ namespace UPSTrackingUpdates.Utilities
     {
         static string rootPath = $"C:\\SQLCLRDLLs\\SharedResources\\Images\\";
 
-        public static void WritePDF(string html, string fullFilePath)
+        public static void WritePDF(string html, string fullFilePath, byte[] deliverySignatureBytes = null, byte[] deliveryPhotographBytes = null)
         {
             var finalStream = new MemoryStream();
 
@@ -25,23 +25,19 @@ namespace UPSTrackingUpdates.Utilities
             Image deliverySignature = null;
 
             Image deliveryPhotograph = null;
-
-            var deliverySignaturePath = $"{Path.GetDirectoryName(fullFilePath)}\\DeliverySignature.gif";
-
-            if (File.Exists(deliverySignaturePath))
+            
+            if (deliverySignatureBytes != null && deliverySignatureBytes.Length > 0)
             {
-                System.Drawing.Image deliverySignatureImage = System.Drawing.Image.FromFile(deliverySignaturePath);
+                System.Drawing.Image deliverySignatureImage = System.Drawing.Image.FromStream(new MemoryStream(deliverySignatureBytes));
 
                 deliverySignature = Image.GetInstance(deliverySignatureImage, System.Drawing.Imaging.ImageFormat.Gif);
 
                 deliverySignature.ScaleAbsolute(208.0f, 47.0f);
             }
 
-            var deliveryPhotographPath = $"{Path.GetDirectoryName(fullFilePath)}\\DeliveryPhotograph.gif";
-
-            if (File.Exists(deliveryPhotographPath))
+            if (deliveryPhotographBytes != null)
             {
-                System.Drawing.Image deliveryPhotographImage = System.Drawing.Image.FromFile(deliverySignaturePath);
+                System.Drawing.Image deliveryPhotographImage = System.Drawing.Image.FromStream(new MemoryStream(deliveryPhotographBytes));
 
                 deliveryPhotograph = Image.GetInstance(deliveryPhotographImage, System.Drawing.Imaging.ImageFormat.Gif);
 
